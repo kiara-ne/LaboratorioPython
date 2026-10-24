@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Float
+from sqlalchemy import create_engine, Column, Integer, String, Float, Date, Time, ForeignKey
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 # Motor: la conexión con la base de datos SQLite
@@ -18,6 +18,17 @@ class Product(Base):
     id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     name = Column(String, nullable=False)
     price = Column(Float, nullable=False)
+
+class Sale(Base):
+    __tablename__ = "sales"
+
+    id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    date = Column(Date, nullable=False)
+    time = Column(Time, nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    amount = Column(Integer, nullable=False)
+    total_price = Column(Float, nullable=False)
+
 
 
 # Crea las tablas en el archivo database.db si todavía no existen
