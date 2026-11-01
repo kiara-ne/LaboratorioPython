@@ -15,8 +15,6 @@ class ProductCreate(BaseModel):
 
 
 
-
-
 class SalesResponse(BaseModel):
     id: int
     date: datetime.date
@@ -36,3 +34,14 @@ class SalesCreate(BaseModel):
 
 
 
+class CartResponse(BaseModel):
+    id: int
+    creation_date: datetime.date
+    state: str
+
+    class Config:
+        from_attributes = True
+        
+class CartCreate(BaseModel):
+    creation_date: datetime.date
+    state: str

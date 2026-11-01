@@ -7,8 +7,8 @@ from fastapi import FastAPI, HTTPException, status
 # Traigo desde mi archivo database.py:
 #   - Product: la clase que representa la tabla "products"
 #   - session: la sesión para leer y guardar datos en la base
-from database import Product, session, Sale
-from schema import ProductResponse,ProductCreate, SalesResponse, SalesCreate
+from database import Product, session, Sale, Cart, CartProduct
+from schema import ProductResponse,ProductCreate, SalesResponse, SalesCreate, CartCreate, CartResponse
 
 # Instancia de la API: a esta variable se le van a ir registrando todos los endpoints
 app = FastAPI()
@@ -152,7 +152,7 @@ def get_sale (id:int):
         if sale is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="The sale does not exists"
+                detail="The sale does not exist"
             )
         return sale
         
@@ -204,7 +204,6 @@ def create_sale(data:SalesCreate):
             detail=f"An error occurred while trying to create a new sale: {e}",
         )
 
-
 @app.put("/sales/{id}", response_model=SalesResponse)
 def update_sale(id:int, data:SalesCreate):
 
@@ -250,7 +249,6 @@ def update_sale(id:int, data:SalesCreate):
             detail=f"An error occurred while trying to update the sale: {e}",
         )
 
-
 @app.delete("/sales/{id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_sale (id:int):
     try:
@@ -277,3 +275,110 @@ def delete_sale (id:int):
 
 
 
+@app.get ("/carts", response_model=list[CartResponse])
+def list_carts():
+
+    try:
+        carts = session.query(Cart).all()
+        return carts
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred while trying to get carts {e}",
+        )
+
+@app.get("/carts/{id}", response_model=CartResponse)
+def get_cart (id:int):
+
+    try: 
+        cart = session.get(Cart, id)
+
+        if cart is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="The cart does not exist"
+            )
+        return cart
+    
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred while trying to get cart: {e}",
+        )
+
+@app.post ("/carts", response_model=CartResponse, status_code=status.HTTP_201_CREATED)
+def create_cart (data:CartCreate):
+
+    try:
+        new_cart = Cart (creation_date=data.creation_date,state=data.state)
+        session.add(new_cart)
+        session.commit()
+        session.refresh(new_cart)
+
+        return new_cart
+
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred while trying to create the cart: {e}",
+        )
+
+@app.put ("/carts/{id}", response_model=CartResponse)
+def update_cart (id:int, data:CartCreate):
+
+    try:
+        cart = session.get(Cart, id)
+
+        if cart is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="The cart does not exist",
+            )
+
+        cart.state = data.state
+        session.commit()
+        session.refresh(cart)
+        return cart
+
+    
+    except HTTPException:
+        raise
+        
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred while trying to update the cart: {e}",
+        )
+
+@app.delete ("/carts/{id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_cart(id: int):
+    try:
+        cart = session.get(Cart, id)
+
+        if cart is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="The cart does not exist",
+            )
+
+        session.query(CartProduct).filter(CartProduct.cart_id == id).delete()
+        session.delete(cart)
+        session.commit()
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred while trying to delete the cart: {e}",
+        )
+    
