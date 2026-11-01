@@ -33,15 +33,27 @@ class SalesCreate(BaseModel):
     amount: int
 
 
+class CartItemResponse(BaseModel):
+    id: int
+    product: ProductResponse
+    amount: int
+
+    class Config:
+        from_attributes = True
 
 class CartResponse(BaseModel):
     id: int
     creation_date: datetime.date
     state: str
-
+    items: list[CartItemResponse] = []
+    
     class Config:
         from_attributes = True
         
 class CartCreate(BaseModel):
     creation_date: datetime.date
     state: str
+
+class CartProductCreate(BaseModel):
+    product_id: int
+    amount: int
