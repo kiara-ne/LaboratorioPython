@@ -19,16 +19,18 @@ class Product(Base):
     name = Column(String, nullable=False)
     price = Column(Float, nullable=False)
 
+# Venta: tiene fecha, hora, un único carrito y el total calculado a partir de ese carrito
 class Sale(Base):
     __tablename__ = "sales"
 
     id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     date = Column(Date, nullable=False)
     time = Column(Time, nullable=False)
-    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    amount = Column(Integer, nullable=False)
+    cart_id = Column(Integer, ForeignKey("carts.id"), unique=True, nullable=False)
     total_price = Column(Float, nullable=False)
 
+    # Atajo para llegar al carrito completo de esta venta
+    cart = relationship("Cart")
 
 class Cart(Base):
     __tablename__ = "carts"
