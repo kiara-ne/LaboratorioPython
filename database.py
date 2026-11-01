@@ -30,6 +30,22 @@ class Sale(Base):
     total_price = Column(Float, nullable=False)
 
 
+class Cart(Base):
+    __tablename__ = "carts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    creation_date = Column(Date, nullable=False)
+    state = Column(String, nullable=False)
+
+class CartProduct(Base):
+    __tablename__ = "cart_product"
+
+    id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    cart_id = Column(Integer, ForeignKey("carts.id"), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    amount = Column(Integer, nullable=False)
+
+
 
 # Crea las tablas en el archivo database.db si todavía no existen
 Base.metadata.create_all(engine)
