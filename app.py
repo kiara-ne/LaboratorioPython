@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException, status
 #   - Product: la clase que representa la tabla "products"
 #   - session: la sesión para leer y guardar datos en la base
 from database import Product, session, Sale, Cart, CartProduct
-from schema import ProductResponse,ProductCreate, SalesResponse, SalesCreate, CartCreate, CartResponse
+from schema import ProductResponse,ProductCreate, SalesResponse, SalesCreate, CartCreate, CartResponse,CartItemResponse,CartProductCreate
 
 # Instancia de la API: a esta variable se le van a ir registrando todos los endpoints
 app = FastAPI()
@@ -381,4 +381,129 @@ def delete_cart(id: int):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred while trying to delete the cart: {e}",
         )
-    
+
+
+# POST /carts/{id}/products: agrega un producto a un carrito abierto y devuelve el carrito con sus items
+@app.post("/carts/{id}/products", response_model=CartResponse, status_code=status.HTTP_201_CREATED)
+def add_product_to_cart(id: int, data: CartProductCreate):
+    try:
+        # Busco el carrito con el id que llegó en la URL
+        cart = session.get(Cart, id)
+
+        # Si el carrito no existe, devuelvo 404
+        if cart is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="The cart does not exist",
+            )
+
+        # Solo se pueden agregar productos a un carrito abierto; si no, 400
+        if cart.state != "open":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="The cart is not open",
+            )
+
+        # Busco el producto usando el product_id que llegó en el body
+        product = session.get(Product, data.product_id)
+
+        # Si el producto no existe, devuelvo 404
+        if product is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="The product does not exist",
+            )
+
+        # La cantidad tiene que ser mayor a 0; si no, 400
+        if data.amount <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="The amount must be greater than 0",
+            )
+
+        # Busco si ese producto ya está cargado en este carrito (fila de cart_product)
+        cart_product = session.query(CartProduct).filter_by(cart_id=cart.id, product_id=data.product_id).first()
+
+        if cart_product:
+            # Ya estaba en el carrito: le sumo la cantidad nueva, sin crear otra fila
+            cart_product.amount += data.amount
+        else:
+            # No estaba: creo una fila nueva en cart_product
+            cart_product = CartProduct(cart_id=cart.id, product_id=data.product_id, amount=data.amount)
+            session.add(cart_product)
+
+        # Guardo los cambios en la base
+        session.commit()
+
+        # Recargo el carrito para que su lista items incluya la fila nueva o actualizada
+        session.refresh(cart)
+
+        # Devuelvo el carrito (no la fila), porque el response_model es el del carrito
+        return cart
+
+    # Dejo pasar los 404 y 400 que levanté yo, para que el except de abajo no los convierta en 500
+    except HTTPException:
+        raise
+
+    # Cualquier otro error inesperado (por ejemplo, falla la base) cae acá
+    except Exception as e:
+        # Deshago lo que quedó a medias para dejar la sesión limpia
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred while trying to add the product to the cart: {e}",
+        )
+
+# DELETE /carts/{id}/products/{product_id}: quita un producto de un carrito abierto y devuelve el carrito actualizado
+@app.delete("/carts/{id}/products/{product_id}", response_model=CartResponse)
+def remove_product_from_cart(id: int, product_id: int):
+    try:
+        # Busco el carrito con el id que llegó en la URL
+        cart = session.get(Cart, id)
+
+        # Si el carrito no existe, devuelvo 404
+        if cart is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="The cart does not exist",
+            )
+
+        # Solo se pueden quitar productos de un carrito abierto; si no, 400
+        if cart.state != "open":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="The cart must be open",
+            )
+
+        # Busco la fila de cart_product que une este carrito con este producto
+        cart_product = session.query(CartProduct).filter_by(cart_id=cart.id, product_id=product_id).first()
+
+        # Si el producto no está en el carrito, devuelvo 404
+        if cart_product is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="That product does not exist in the cart",
+            )
+
+        # Borro la fila y guardo el cambio en la base
+        session.delete(cart_product)
+        session.commit()
+
+        # Recargo el carrito para que items ya no incluya el producto quitado
+        session.refresh(cart)
+
+        # Devuelvo el carrito actualizado
+        return cart
+
+    # Dejo pasar los 404 y 400 que levanté yo, para que el except de abajo no los convierta en 500
+    except HTTPException:
+        raise
+
+    # Cualquier otro error inesperado cae acá
+    except Exception as e:
+        # Deshago lo que quedó a medias para dejar la sesión limpia
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred while trying to remove the product from the cart: {e}",
+        )

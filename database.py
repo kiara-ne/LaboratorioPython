@@ -1,5 +1,5 @@
 from sqlalchemy import create_engine, Column, Integer, String, Float, Date, Time, ForeignKey
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 
 # Motor: la conexión con la base de datos SQLite
 engine = create_engine("sqlite:///database.db", echo=True)
@@ -37,6 +37,9 @@ class Cart(Base):
     creation_date = Column(Date, nullable=False)
     state = Column(String, nullable=False)
 
+    items = relationship("CartProduct", back_populates="cart")
+
+
 class CartProduct(Base):
     __tablename__ = "cart_product"
 
@@ -45,7 +48,8 @@ class CartProduct(Base):
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     amount = Column(Integer, nullable=False)
 
-
+    cart = relationship("Cart", back_populates="items")
+    product = relationship("Product")
 
 # Crea las tablas en el archivo database.db si todavía no existen
 Base.metadata.create_all(engine)
